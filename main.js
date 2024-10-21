@@ -178,12 +178,13 @@ export default class DrawSVGShapes {
       this.svg.style.cursor = 'crosshair';
     });
 
-    this.handleShapeEvents(shape, crossGroup);
+    this.handleMoveEvents(shape, crossGroup);
+    this.handleResizeEvents(shape, crossGroup);
 
     this.svg.appendChild(outerGroup);
   }
 
-  handleShapeEvents(shape, crossGroup) {
+  handleMoveEvents(shape, crossGroup) {
     shape.addEventListener('mouseover', () => {
       if (this.coordinates.length > 0) return;
       this.svg.style.cursor = 'grab';
@@ -247,6 +248,62 @@ export default class DrawSVGShapes {
     return shape.getAttribute('points').split(' ').map(point => {
       const [x, y] = point.split(',').map(Number);
       return { x, y };
+    });
+  }
+
+  handleResizeEvents(shape, crossGroup) {
+    this.movingCoordinates = this.getShapePoints(shape);
+    shape.remove();
+    this.svg.appendChild(shape);
+    // crossGroup.remove();
+
+    // Add draggable handles
+    this.movingCoordinates.forEach((coord, index) => {
+      const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      handle.setAttribute('cx', coord.x);
+      handle.setAttribute('cy', coord.y);
+      handle.setAttribute('r', 5);
+      handle.setAttribute('fill', '#00000000');
+      handle.setAttribute('cursor', 'move');
+      this.svg.appendChild(handle);
+
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        this.isDragging = true;
+        this.draggingPointIndex = index;
+        this.svg.style.cursor = 'grabbing';
+      });
+
+      handle.addEventListener('mousemove', (e) => {
+        if (!this.isDragging || this.draggingPointIndex !== index) return;
+
+        const deltaX = e.offsetX - coord.x;
+        const deltaY = e.offsetY - coord.y;
+
+        this.movingCoordinates[index] = { x: e.offsetX, y: e.offsetY };
+
+        const updatedPointsString = this.movingCoordinates.map(coord => `${coord.x},${coord.y}`).join(' ');
+        shape.setAttribute('points', updatedPointsString);
+
+        handle.setAttribute('cx', e.offsetX);
+        handle.setAttribute('cy', e.offsetY);
+      });
+
+      handle.addEventListener('mouseup', (e) => {
+        if (!this.isDragging || this.draggingPointIndex !== index) return;
+        this.isDragging = false;
+        this.svg.style.cursor = 'default';
+      });
+
+      handle.addEventListener('mouseout', () => {
+        if (!this.isDragging || this.draggingPointIndex !== index) return;
+        this.isDragging = false;
+        this.svg.style.cursor = 'default';
+      });
+
+      handle.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
     });
   }
 }
