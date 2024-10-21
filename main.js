@@ -10,6 +10,8 @@ export default class DrawSVGShapes {
     this.drawingType = drawingType;
     this.CLICK_THRESHOLD = 10;
     this.previewLine = null;
+    this.previousLine = [];
+    this.IsDragging = false;
 
     this.init();
   }
@@ -17,24 +19,30 @@ export default class DrawSVGShapes {
   init() {
     this.svg.onclick = this.handleClick.bind(this);
     this.svg.onmousemove = this.handleMouseMove.bind(this);
+    this.svg.style.cursor = 'crosshair';
   }
 
   handleClick(e) {
     if (this.drawingType === 'polygon') {
-      /**
-       * @type {string}
-       */
       const point = `${e.offsetX},${e.offsetY}`;
 
       if (this.points.length > 2) {
-        const start = this.points[0];
-
-        if (Math.abs(e.offsetX - start.split(',')[0]) < this.CLICK_THRESHOLD && Math.abs(e.offsetY - start.split(',')[1]) < this.CLICK_THRESHOLD) {
-          this.points.push(start);
+        if (this.isPolygonCompleted(e.offsetX, e.offsetY)) {
+          this.points.push(this.points[0]);
           this.currentShape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
           this.currentShape.setAttribute('points', this.points.join(' '));
           this.currentShape.setAttribute('style', 'fill:blue;stroke:black;stroke-width:2;');
-          this.svg.appendChild(this.currentShape);
+
+          this.drawCrossIcon(this.getTopRightCorner(), this.currentShape);
+          if (this.previewLine) {
+            this.previewLine.remove();
+          }
+
+          if (this.previousLine.length > 0) {
+            this.previousLine.forEach(line => {
+              line.remove();
+            });
+          }
 
           this.points = [];
           this.drawings.push({ points: this.coordinates, type: this.drawingType });
@@ -53,6 +61,8 @@ export default class DrawSVGShapes {
         this.line.setAttribute('style', 'stroke:black;stroke-width:2;');
 
         this.svg.appendChild(this.line);
+
+        this.previousLine.push(this.line);
       }
 
       this.points.push(point);
@@ -62,9 +72,6 @@ export default class DrawSVGShapes {
 
   handleMouseMove(e) {
     if (this.drawingType === 'polygon') {
-      /**
-       * @type {string}
-       */
       const point = `${e.offsetX},${e.offsetY}`;
 
       if (this.points.length > 0) {
@@ -83,85 +90,126 @@ export default class DrawSVGShapes {
       }
     }
   }
+
+  isPolygonCompleted(x, y) {
+    const firstPoint = this.coordinates[0];
+    const distance = Math.sqrt(Math.pow(x - firstPoint.x, 2) + Math.pow(y - firstPoint.y, 2));
+    return distance < this.CLICK_THRESHOLD;
+  }
+
+  getTopRightCorner() {
+    const svgWidth = this.svg.clientWidth;
+    const svgHeight = this.svg.clientHeight;
+    let minDistance = Number.MAX_VALUE;
+    let topRightCorner = { x: 0, y: 0 };
+
+    this.coordinates.forEach(coord => {
+      const distance = Math.sqrt(Math.pow(svgWidth - coord.x, 2) + Math.pow(coord.y, 2));
+      if (distance < minDistance) {
+        minDistance = distance;
+        topRightCorner = { x: coord.x, y: coord.y };
+      }
+    });
+
+    return topRightCorner;
+  }
+
+  drawCrossIcon({ x, y }, polygon) {
+    const size = 10;
+    const circleRadius = size;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    circle.setAttribute('r', circleRadius);
+    circle.setAttribute('fill', 'white');
+    circle.setAttribute('stroke', 'black');
+    circle.setAttribute('stroke-width', 2);
+
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', x - size / 2);
+    line1.setAttribute('y1', y - size / 2);
+    line1.setAttribute('x2', x + size / 2);
+    line1.setAttribute('y2', y + size / 2);
+    line1.setAttribute('stroke', 'black');
+    line1.setAttribute('stroke-width', 2);
+
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', x + size / 2);
+    line2.setAttribute('y1', y - size / 2);
+    line2.setAttribute('x2', x - size / 2);
+    line2.setAttribute('y2', y + size / 2);
+    line2.setAttribute('stroke', 'black');
+    line2.setAttribute('stroke-width', 2);
+
+    const crossGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    crossGroup.appendChild(circle);
+    crossGroup.appendChild(line1);
+    crossGroup.appendChild(line2);
+
+    const outerGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    outerGroup.appendChild(polygon);
+    outerGroup.appendChild(crossGroup);
+
+    crossGroup.addEventListener('click', (e) => {
+      if (this.coordinates.length > 0) return;
+
+      e.stopPropagation();
+      this.svg.removeChild(outerGroup);
+      this.svg.style.cursor = 'crosshair';
+    });
+
+    crossGroup.addEventListener('mouseover', (e) => {
+      if (this.coordinates.length > 0) return;
+
+      e.stopPropagation();
+      this.svg.style.cursor = 'pointer';
+    });
+
+    crossGroup.addEventListener('mouseout', (e) => {
+      if (this.coordinates.length > 0) return;
+
+      e.stopPropagation();
+      this.svg.style.cursor = 'crosshair';
+    });
+
+    outerGroup.addEventListener('mouseover', () => {
+      if (this.coordinates.length > 0) return;
+      this.svg.style.cursor = 'grab';
+    });
+
+    outerGroup.addEventListener('mousedown', (e) => {
+      if (this.coordinates.length > 0) return;
+      e.stopPropagation();
+      this.IsDragging = true;
+      this.svg.style.cursor = 'grabbing';
+    });
+
+    outerGroup.addEventListener('mousemove', () => {
+      if (this.coordinates.length > 0) return;
+
+    });
+
+    outerGroup.addEventListener('mouseup', (e) => {
+      if (this.coordinates.length > 0) return;
+
+      e.stopPropagation();
+      this.IsDragging = false;
+      this.svg.style.cursor = 'grab';
+    });
+
+    outerGroup.addEventListener('mouseout', () => {
+      if (this.coordinates.length > 0) return;
+
+      this.svg.style.cursor = 'crosshair';
+    });
+
+    outerGroup.addEventListener('click', (e) => {
+      if (this.coordinates.length > 0) return;
+
+      e.stopPropagation();
+    });
+
+    this.svg.appendChild(outerGroup);
+  }
 }
-
-// svg?.addEventListener('mousedown', (e) => {
-//   const target = e.target;
-//   const shapeType = shapeTypeSelect.value;
-
-//   if (shapeType === 'rect') {
-//     if (target.tagName === 'rect') {
-//       isDragging = true;
-//       currentShape = target;
-//       startX = e.offsetX;
-//       startY = e.offsetY;
-//       offsetX = startX - parseFloat(currentShape.getAttribute('x'));
-//       offsetY = startY - parseFloat(currentShape.getAttribute('y'));
-//     } else {
-//       isDrawing = true;
-//       startX = e.offsetX;
-//       startY = e.offsetY;
-//       currentShape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-//       currentShape.setAttribute('x', startX);
-//       currentShape.setAttribute('y', startY);
-//       currentShape.setAttribute('width', 0);
-//       currentShape.setAttribute('height', 0);
-//       currentShape.setAttribute('style', 'fill:blue;stroke:black;stroke-width:2;');
-//       svg.appendChild(currentShape);
-//     }
-//   } else if (shapeType === 'polygon') {
-//     if (target.tagName === 'polygon') {
-//       isDragging = true;
-//       currentShape = target;
-//       // Handle dragging logic for polygon if needed
-//     } else {
-//       isDrawing = true;
-//       const point = `${e.offsetX},${e.offsetY}`;
-//       points.push(point);
-//       if (!currentShape) {
-//         currentShape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-//         currentShape.setAttribute('points', points.join(' '));
-//         currentShape.setAttribute('style', 'fill:blue;stroke:black;stroke-width:2;');
-//         svg.appendChild(currentShape);
-//       } else {
-//         currentShape.setAttribute('points', points.join(' '));
-//       }
-//     }
-//   }
-// });
-
-// svg?.addEventListener('mousemove', (e) => {
-//   if (isDrawing) {
-//     const shapeType = shapeTypeSelect.value;
-//     if (shapeType === 'rect') {
-//       const currentX = e.offsetX;
-//       const currentY = e.offsetY;
-//       const width = Math.abs(currentX - startX);
-//       const height = Math.abs(currentY - startY);
-//       currentShape.setAttribute('width', width);
-//       currentShape.setAttribute('height', height);
-//       currentShape.setAttribute('x', Math.min(currentX, startX));
-//       currentShape.setAttribute('y', Math.min(currentY, startY));
-//     } else if (shapeType === 'polygon') {
-//       const point = `${e.offsetX},${e.offsetY}`;
-//       points[points.length - 1] = point;
-//       currentShape.setAttribute('points', points.join(' '));
-//     }
-//   } else if (isDragging) {
-//     const shapeType = shapeTypeSelect.value;
-//     if (shapeType === 'rect') {
-//       const currentX = e.offsetX;
-//       const currentY = e.offsetY;
-//       currentShape.setAttribute('x', currentX - offsetX);
-//       currentShape.setAttribute('y', currentY - offsetY);
-//     } else if (shapeType === 'polygon') {
-//       // Handle dragging logic for polygon if needed
-//     }
-//   }
-// });
-
-// svg?.addEventListener('mouseup', (e) => {
-//   isDrawing = false;
-//   isDragging = false;
-//   points = [];
-// });
