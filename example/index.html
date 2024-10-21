@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="main.js" type="module" defer></script>
+</head>
+
+<body>
+    <select id="drawType">
+        <option value="polygon">Polygon</option>
+        <option value="line">Line</option>
+        <option value="rectangle">Rectangle</option>
+        <option value="circle">Circle</option>
+        <option value="triangle">Triangle</option>
+    </select>
+    <select id="colorPicker">
+        <option value="#00000090">Black</option>
+        <option value="#ff000090">Red</option>
+        <option value="#0000ff90">Blue</option>
+        <option value="#00ff0090">Green</option>
+    </select>
+    <button id="cancelButton">Cancel</button>
+    <button id="clearButton">Clear</button>
+    <select id="gridSize">
+        <option value="10">10x10</option>
+        <option value="20">20x20</option>
+        <option value="30">30x30</option>
+        <option value="40">40x40</option>
+    </select>
+    <input type="checkbox" id="showGrid">Show Grid</input>
+    <select id="drawMode">
+        <option value="resize">Resize</option>
+        <option value="draw">Draw</option>
+        <option value="move">Move</option>
+    </select>
+    <br>
+    <input type="number" id="height" value="300"> x <input type="number" id="width" value="497">
+    <input type="button" id="save" value="Save">
+    <svg id="svg"></svg>
+</body>
+
+</html>
