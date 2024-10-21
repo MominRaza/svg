@@ -35,11 +35,8 @@ export default class DrawSVGShapes {
           this.currentShape.setAttribute('points', this.points.join(' '));
           this.currentShape.setAttribute('style', 'fill:blue;stroke:black;stroke-width:2;');
 
-          this.svg.appendChild(this.currentShape);
+          this.drawCrossIcon(this.currentShape);
 
-          this.handleShapeEvents(this.currentShape);
-
-          this.drawCrossIcon(this.getTopRightCorner(), this.currentShape);
           if (this.previewLine) {
             this.previewLine.remove();
           }
@@ -103,13 +100,14 @@ export default class DrawSVGShapes {
     return distance < this.CLICK_THRESHOLD;
   }
 
-  getTopRightCorner() {
+  getTopRightCorner(shape) {
     const svgWidth = this.svg.clientWidth;
-    const svgHeight = this.svg.clientHeight;
     let minDistance = Number.MAX_VALUE;
     let topRightCorner = { x: 0, y: 0 };
 
-    this.coordinates.forEach(coord => {
+    const points = this.getShapePoints(shape);
+
+    points.forEach(coord => {
       const distance = Math.sqrt(Math.pow(svgWidth - coord.x, 2) + Math.pow(coord.y, 2));
       if (distance < minDistance) {
         minDistance = distance;
@@ -120,9 +118,10 @@ export default class DrawSVGShapes {
     return topRightCorner;
   }
 
-  drawCrossIcon({ x, y }, shape) {
+  drawCrossIcon(shape) {
     const size = 10;
     const circleRadius = size;
+    const { x, y } = this.getTopRightCorner(shape);
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', x);
@@ -153,12 +152,15 @@ export default class DrawSVGShapes {
     crossGroup.appendChild(line1);
     crossGroup.appendChild(line2);
 
+    const outerGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    outerGroup.appendChild(shape);
+    outerGroup.appendChild(crossGroup);
+
     crossGroup.addEventListener('click', (e) => {
       if (this.coordinates.length > 0) return;
 
       e.stopPropagation();
-      this.svg.removeChild(crossGroup);
-      this.svg.removeChild(shape);
+      this.svg.removeChild(outerGroup);
       this.svg.style.cursor = 'crosshair';
     });
 
@@ -176,10 +178,12 @@ export default class DrawSVGShapes {
       this.svg.style.cursor = 'crosshair';
     });
 
-    this.svg.appendChild(crossGroup);
+    this.handleShapeEvents(shape, crossGroup);
+
+    this.svg.appendChild(outerGroup);
   }
 
-  handleShapeEvents(shape) {
+  handleShapeEvents(shape, crossGroup) {
     shape.addEventListener('mouseover', () => {
       if (this.coordinates.length > 0) return;
       this.svg.style.cursor = 'grab';
@@ -192,11 +196,10 @@ export default class DrawSVGShapes {
       this.DraggingStartPoint = { x: e.offsetX, y: e.offsetY };
       this.svg.style.cursor = 'grabbing';
 
-      const points = shape.getAttribute('points').split(' ').map(point => {
-        const [x, y] = point.split(',').map(Number);
-        return { x, y };
-      });
-      this.movingCoordinates = points;
+      this.movingCoordinates = this.getShapePoints(shape);
+      shape.remove();
+      this.svg.appendChild(shape);
+      crossGroup.remove();
     });
 
     shape.addEventListener('mousemove', (e) => {
@@ -224,6 +227,7 @@ export default class DrawSVGShapes {
       e.stopPropagation();
       this.IsDragging = false;
       this.svg.style.cursor = 'grab';
+      this.drawCrossIcon(shape);
     });
 
     shape.addEventListener('mouseout', () => {
@@ -236,6 +240,13 @@ export default class DrawSVGShapes {
       if (this.coordinates.length > 0) return;
 
       e.stopPropagation();
+    });
+  }
+
+  getShapePoints(shape) {
+    return shape.getAttribute('points').split(' ').map(point => {
+      const [x, y] = point.split(',').map(Number);
+      return { x, y };
     });
   }
 }
